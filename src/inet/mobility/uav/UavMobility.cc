@@ -71,25 +71,16 @@ void UavMobility::setTargetPosition()
 
 void UavMobility::move()
 {
-    EV_INFO << "leader: "<<leader<< endl;
-    /*****************************修改*********************************/
-        if(leader == 0){
-            //集群坐标系到全局坐标系转化方法
-            targetPosition.x = leaderPosition().x + Ref_x*cos(-M_PI*angle/180) - Ref_y*sin(-M_PI*angle/180);
-            targetPosition.y = leaderPosition().y + Ref_x*sin(-M_PI*angle/180) - Ref_y*cos(-M_PI*angle/180);
-            EV_INFO << "jinchenghao!!! "<< targetPosition<<endl;
+    simtime_t now = simTime();
+    if(nextChange == now) {
+        count++;
+        if(count==5){
+            //formationChange();
+        }
     }
-    /*****************************结束*********************************/
 
+    EV_INFO << "leader: "<<leader<< endl;
     LineSegmentsMobilityBase::move();
-
-    /*****************************修改*********************************/
-//    if(leader == 0){
-//            targetPosition.x -= 10;
-//            targetPosition.y -= 10;
-//        }
-    /*****************************结束*********************************/
-
     Coord dummy;
     handleIfOutside(borderPolicy, targetPosition, dummy, angle);
 }
@@ -149,22 +140,10 @@ void UavMobility::executeStatement(cXMLElement *stmt)
 
         if (xAttr){
             targetPosition.x = lastPosition.x = getValue(xAttr);
-            /*****************************修改*********************************/
-//             if(leader == 0){
-//                 targetPosition.x += Ref_x;
-//                 lastPosition.x += Ref_x;
-//              }
-            /*****************************结束*********************************/
         }
 
         if (yAttr){
              targetPosition.y = lastPosition.y = getValue(yAttr);
-//            /*****************************修改*********************************/
-//             if(leader == 0){
-//                  targetPosition.y += Ref_y;
-//                  lastPosition.y += Ref_y;
-//             }
-            /*****************************结束*********************************/
         }
 
 
@@ -218,8 +197,21 @@ void UavMobility::executeStatement(cXMLElement *stmt)
             throw cRuntimeError("<forward>: distance (attribute d) is negative at %s", stmt->getSourceLocation());
 
         // FIXME handle zeros properly...
-        targetPosition.x += d * cos(M_PI * angle / 180);
-        targetPosition.y += d * sin(M_PI * angle / 180);
+        //用文件初始化初始位置
+        //如果是leader则一直按照文件的给定路径走
+        if(leader == 1 || (leader==0 && leaderPosition().x==0 && leaderPosition().y==0)){
+            targetPosition.x += d * cos(M_PI * angle / 180);
+            targetPosition.y += d * sin(M_PI * angle / 180);
+            EV_INFO << "jinchenghao!!! "<< targetPosition<<"speed是："<<speed<<"time 是："<<t<<endl;
+        }
+        //如果是follower后续根据leader坐标来计算自己的编队位置
+        else {
+            convertCoordinate();
+            speed = sqrt(pow((targetPosition.x - lastPosition.x),2) + pow((targetPosition.y - lastPosition.y),2))/t;
+            //lastSpeed = (targetPosition - lastPosition) / (nextChange - simTime()).dbl();
+            EV_INFO <<"leader position is :"<< leaderPosition() << endl;
+            EV_INFO << "jinchenghao!!! "<< targetPosition<<"speed是："<<speed<<"time 是："<<t<<endl;
+        }
         nextChange += t;
     }
     else if (!strcmp(tag, "turn")) {
@@ -392,10 +384,20 @@ Coord UavMobility::getTargetPosition(){
 }
 
 Coord UavMobility::leaderPosition(){
-    cModule *targetModule = getSimulation()->getModule(79);
+    //cModule *targetModule = getSimulation()->getModule(79);
+    cModule *targetModule = getParentModule()->getSubmodule("udpApp",0);
     UAVUdpSink *target = check_and_cast<UAVUdpSink *>(targetModule);
     Coord position =  target->getLeaderPosition();
     return position;
+}
+void UavMobility::convertCoordinate(){
+    //集群坐标系到全局坐标系转化方法
+    targetPosition.x = leaderPosition().x + Ref_x*cos(M_PI*angle/180) - Ref_y*sin(M_PI*angle/180);
+    targetPosition.y = leaderPosition().y + Ref_x*sin(M_PI*angle/180) + Ref_y*cos(M_PI*angle/180);
+}
+
+void UavMobility::formationChange(){
+    Ref_x += 10;
 }
 } // namespace inet
 

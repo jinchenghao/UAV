@@ -42,6 +42,8 @@ class INET_API UavMobility : public LineSegmentsMobilityBase
     //局部坐标系坐标系的位置
     double Ref_x;
     double Ref_y;
+    //飞行的坐标次数
+    int count = 0;
 
   protected:
     virtual int numInitStages() const override { return NUM_INIT_STAGES; }
@@ -77,6 +79,12 @@ class INET_API UavMobility : public LineSegmentsMobilityBase
 
     /** @brief 得到Leader的位置 */
     virtual Coord leaderPosition();
+
+    /** 局部坐标系到全局坐标系转换*/
+    virtual void convertCoordinate();
+
+    /** @brief 队形调整*/
+    virtual void formationChange();
 
   public:
     UavMobility();
